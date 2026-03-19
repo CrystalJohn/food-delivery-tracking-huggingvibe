@@ -1,0 +1,39 @@
+{
+  "extends": ["stylelint-config-standard"],
+  "plugins": ["stylelint-scss"],
+  "rules": {
+    "at-rule-no-unknown": null,
+    "scss/at-rule-no-unknown": true,
+    "scss/at-import-partial-extension": "always",
+    "scss/at-import-no-partial-leading-underscore": true,
+    "scss/at-function-pattern": "^[a-z][a-zA-Z0-9-]*[a-zA-Z0-9]$|^[a-z]$",
+    "scss/at-mixin-pattern": "^[a-z][a-zA-Z0-9-]*[a-zA-Z0-9]$|^[a-z]$",
+    "scss/at-variable-pattern": "^[a-z][a-zA-Z0-9-]*[a-zA-Z0-9]$|^[a-z]$",
+    "scss/dollar-variable-pattern": "^[a-z][a-zA-Z0-9-]*[a-zA-Z0-9]$|^[a-z]$",
+    "scss/percent-placeholder-pattern": "^[a-z][a-zA-Z0-9-]*[a-zA-Z0-9]$|^[a-z]$",
+    "scss/selector-no-redundant-nesting-selector": true,
+    "selector-class-pattern": "^[a-z][a-zA-Z0-9-]*[a-zA-Z0-9]$|^[a-z]$",
+    "color-hex-length": null,
+    "selector-pseudo-element-colon-notation": null,
+    "alpha-value-notation": null,
+    "color-function-notation": null,
+    "scss/no-duplicate-dollar-variables": true,
+    "scss/no-duplicate-mixins": true,
+    "scss/no-global-function-names": true,
+    "selector-pseudo-class-no-unknown": [
+      true,
+      {
+        "ignorePseudoClasses": ["global"]
+      }
+    ]
+  },
+  "ignoreFiles": [
+    "**/node_modules/**",
+    "**/.next/**",
+    "**/out/**",
+    "**/build/**",
+    "**/dist/**",
+    "**/coverage/**"
+  ]
+}
+
