@@ -7,3 +7,7 @@ export { StaffManagementPage } from './StaffManagementPage';
 export { useStaffManagement } from './useStaffManagement';
 export { staffAdminService } from './staff.service';
 export type { StaffAccount, CreateStaffRequest } from './staff.service';
+export { driverAdminService } from './driver.service';
+export type { DriverAccount, CreateDriverRequest } from './driver.service';
+export { useDriverManagement } from './useDriverManagement';
+export { DriverManagementPage } from './DriverManagementPage';

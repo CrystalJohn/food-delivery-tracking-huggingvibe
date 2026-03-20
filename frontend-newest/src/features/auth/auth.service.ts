@@ -17,6 +17,9 @@ export interface RegisterRequest {
   password: string;
   name: string;
   phone?: string;
+  fullAddress: string;
+  lat: number;
+  lng: number;
 }
 
 interface AuthUserPayload {
@@ -25,6 +28,13 @@ interface AuthUserPayload {
   fullName: string;
   role: string;
   phone?: string;
+  defaultAddress?: {
+    id?: string;
+    fullAddress?: string;
+    lat?: number;
+    lng?: number;
+    isDefault?: boolean;
+  };
 }
 
 interface AuthResponsePayload {
@@ -37,15 +47,29 @@ interface RegisterPayload {
   fullName: string;
   password: string;
   phone?: string;
+  fullAddress: string;
+  lat: number;
+  lng: number;
 }
 
 function mapAuthUser(user: AuthUserPayload): User {
+  const hasDefaultAddress = Boolean(user.defaultAddress?.fullAddress);
+
   return {
     id: user.id,
     email: user.email,
     name: user.fullName,
     role: user.role as User['role'],
     phone: user.phone,
+    defaultAddress: hasDefaultAddress
+      ? {
+          id: user.defaultAddress?.id,
+          fullAddress: user.defaultAddress?.fullAddress ?? '',
+          lat: user.defaultAddress?.lat,
+          lng: user.defaultAddress?.lng,
+          isDefault: user.defaultAddress?.isDefault,
+        }
+      : undefined,
   };
 }
 
@@ -68,6 +92,9 @@ export const authService = {
       fullName: data.name,
       password: data.password,
       phone: data.phone,
+      fullAddress: data.fullAddress,
+      lat: data.lat,
+      lng: data.lng,
     };
 
     const response = await api.post<AuthResponsePayload>(

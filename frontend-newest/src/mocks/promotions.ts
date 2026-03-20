@@ -67,7 +67,7 @@ export const MOCK_PROMO_BANNERS = [
     id: '65f1b3c4d5e6f7a8b9c0e004',
     label: 'Weekend Special',
     title: 'BUY 1 GET 1\nFREE',
-    imageUrl: 'https://images.unsplash.com/photo-1562003389-902c26d86b0e?q=80&w=2070',
+    imageUrl: '/Image-menu.png',
     ctaText: 'Get Code',
     ctaLink: '/promotions',
   },

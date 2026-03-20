@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import { Search, MapPin, ClipboardList, ShoppingCart } from 'lucide-react';
@@ -8,9 +8,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'react-toastify';
 import { useAuth } from '@/features/auth';
 import { useCart } from '@/features/cart';
-import { orderService, type PaymentMethod } from '@/features/orders';
-import { CheckoutAddressModal } from '@/features/checkout/CheckoutAddressModal';
-import { CartSidebar } from '@/components/shared/CartSidebar';
+import { orderService } from '@/features/orders';
+import { CartSidebar, type CartCheckoutPayload } from '@/components/shared/CartSidebar';
 import { ProfileMenu } from '@/components/shared/ProfileMenu';
 
 const FALLBACK_IMAGE =
@@ -22,12 +21,10 @@ export function CustomerHeader() {
   const searchParams = useSearchParams();
   const { user, logout, isAuthenticated } = useAuth();
   const { itemCount, items, updateQuantity, removeItem, refreshCart } = useCart();
+
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isCheckingOut, setIsCheckingOut] = useState(false);
-  const [addressModalOpen, setAddressModalOpen] = useState(false);
-  const [pendingPaymentMethod, setPendingPaymentMethod] = useState<PaymentMethod | null>(null);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
   const [searchQuery, setSearchQuery] = useState(searchParams.get('q') || '');
 
   useEffect(() => {
@@ -64,37 +61,52 @@ export function CustomerHeader() {
     router.push('/login');
   };
 
-  const handleCheckoutRequest = (paymentMethod: PaymentMethod) => {
+  const handleCheckoutRequest = async ({
+    paymentMethod,
+    addressOption,
+    customAddress,
+    customAddressLat,
+    customAddressLng,
+  }: CartCheckoutPayload) => {
     if (isCheckingOut) return;
+
     if (!isAuthenticated) {
       router.push('/login');
       return;
     }
-    setPendingPaymentMethod(paymentMethod);
-    setAddressModalOpen(true);
-  };
 
-  const handleAddressConfirm = async (
-    result: { deliveryLat: number; deliveryLng: number; address?: string } | null,
-  ) => {
-    setAddressModalOpen(false);
-    const paymentMethod = pendingPaymentMethod ?? 'CASH';
-    setPendingPaymentMethod(null);
+    if (
+      addressOption === 'CUSTOM' &&
+      (!customAddress || customAddressLat == null || customAddressLng == null)
+    ) {
+      toast.error('Please select custom address suggestion or use My Location before checkout.');
+      return;
+    }
+
+    const checkoutPayload =
+      addressOption === 'CUSTOM'
+        ? {
+            paymentMethod,
+            deliveryAddressMode: 'CUSTOM' as const,
+            deliveryAddressText: customAddress,
+            deliveryLat: customAddressLat,
+            deliveryLng: customAddressLng,
+          }
+        : {
+            paymentMethod,
+            deliveryAddressMode: 'DEFAULT' as const,
+          };
 
     setIsCheckingOut(true);
     try {
-      const coords =
-        result != null
-          ? { deliveryLat: result.deliveryLat, deliveryLng: result.deliveryLng }
-          : undefined;
-      await orderService.checkoutActiveCart(paymentMethod, coords);
+      await orderService.checkoutActiveCart(checkoutPayload);
       await refreshCart();
       setIsCartOpen(false);
-      toast.success('Đặt hàng thành công. Bạn có thể theo dõi trong Đơn của tôi.');
+      toast.success('Order placed successfully. You can track it in My Orders.');
       router.push('/orders');
     } catch (error) {
       console.error('[CHECKOUT] checkout failed', error);
-      toast.error('Đặt hàng thất bại. Vui lòng thử lại.');
+      toast.error('Checkout failed. Please try again.');
     } finally {
       setIsCheckingOut(false);
     }
@@ -110,59 +122,59 @@ export function CustomerHeader() {
 
   return (
     <>
-      <header className="sticky top-0 z-50 w-full bg-white border-b border-gray-200 shadow-sm h-16 md:h-20 flex items-center">
-        <div className="container mx-auto px-4 lg:px-8 w-full flex items-center justify-between gap-4">
-          <Link href="/" className="flex items-center gap-2 group flex-shrink-0">
+      <header className="sticky top-0 z-50 flex h-16 w-full items-center border-b border-gray-200 bg-white shadow-sm md:h-20">
+        <div className="container mx-auto flex w-full items-center justify-between gap-4 px-4 lg:px-8">
+          <Link href="/" className="group flex flex-shrink-0 items-center gap-2">
             <motion.div
-              className="w-10 h-10 bg-red-600 rounded-full flex items-center justify-center"
+              className="flex h-10 w-10 items-center justify-center rounded-full bg-red-600"
               whileHover={{ scale: 1.05, rotate: 5 }}
               transition={{ type: 'spring', stiffness: 400 }}
             >
-              <span className="text-white font-bold text-xl">F</span>
+              <span className="text-xl font-bold text-white">F</span>
             </motion.div>
-            <span className="hidden md:block text-xl font-bold text-gray-900 group-hover:text-red-600 transition-colors">
+            <span className="hidden text-xl font-bold text-gray-900 transition-colors group-hover:text-red-600 md:block">
               FoodGo
             </span>
           </Link>
 
-          <div className="flex-1 max-w-2xl px-2 md:px-8">
+          <div className="max-w-2xl flex-1 px-2 md:px-8">
             <div className="relative w-full">
-              <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                <Search className="w-5 h-5 text-gray-400" />
+              <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4">
+                <Search className="h-5 w-5 text-gray-400" />
               </div>
               <input
                 type="text"
                 value={searchQuery}
                 onChange={handleSearchChange}
                 placeholder="Search for food, coffee, etc..."
-                className="w-full bg-gray-50 border border-gray-200 text-gray-900 text-sm rounded-full focus:ring-red-500 focus:border-red-500 block pl-12 pr-4 py-2.5 outline-none transition-all hover:bg-gray-100 placeholder:text-gray-400"
+                className="block w-full rounded-full border border-gray-200 bg-gray-50 py-2.5 pl-12 pr-4 text-sm text-gray-900 outline-none transition-all placeholder:text-gray-400 hover:bg-gray-100 focus:border-red-500 focus:ring-red-500"
               />
             </div>
           </div>
 
-          <div className="flex items-center gap-2 md:gap-4 flex-shrink-0">
-            <button className="p-2 hover:bg-gray-100 rounded-full transition-colors hidden sm:block text-gray-600">
-              <MapPin className="w-5 h-5" />
+          <div className="flex flex-shrink-0 items-center gap-2 md:gap-4">
+            <button className="hidden rounded-full p-2 text-gray-600 transition-colors hover:bg-gray-100 sm:block">
+              <MapPin className="h-5 w-5" />
             </button>
 
-            <div className="h-6 w-[1px] bg-gray-200 hidden sm:block mx-1"></div>
+            <div className="mx-1 hidden h-6 w-[1px] bg-gray-200 sm:block"></div>
 
-            <button className="p-2 hover:bg-gray-100 rounded-full transition-colors hidden sm:block text-gray-600">
-              <ClipboardList className="w-5 h-5" />
+            <button className="hidden rounded-full p-2 text-gray-600 transition-colors hover:bg-gray-100 sm:block">
+              <ClipboardList className="h-5 w-5" />
             </button>
 
             <button
               onClick={() => setIsCartOpen(true)}
-              className="relative p-2 hover:bg-gray-100 rounded-full transition-colors text-gray-600 focus:outline-none"
+              className="relative rounded-full p-2 text-gray-600 transition-colors hover:bg-gray-100 focus:outline-none"
             >
-              <ShoppingCart className="w-6 h-6" />
+              <ShoppingCart className="h-6 w-6" />
               <AnimatePresence>
                 {itemCount > 0 && (
                   <motion.span
                     initial={{ scale: 0 }}
                     animate={{ scale: 1 }}
                     exit={{ scale: 0 }}
-                    className="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center shadow-sm"
+                    className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-600 text-[10px] font-bold text-white shadow-sm"
                   >
                     {itemCount}
                   </motion.span>
@@ -175,30 +187,22 @@ export function CustomerHeader() {
         </div>
       </header>
 
-      <CheckoutAddressModal
-        open={addressModalOpen}
-        onClose={() => {
-          setAddressModalOpen(false);
-          setPendingPaymentMethod(null);
-        }}
-        onConfirm={handleAddressConfirm}
-      />
       <CartSidebar
         isOpen={isCartOpen}
         onClose={() => setIsCartOpen(false)}
         items={sidebarItems}
+        defaultAddress={user?.defaultAddress?.fullAddress ?? ''}
         onUpdateQuantity={(id, quantity) => {
           void updateQuantity(id, quantity);
         }}
         onRemoveItem={(id) => {
           void removeItem(id);
         }}
-        onCheckout={(paymentMethod) => handleCheckoutRequest(paymentMethod)}
+        onCheckout={(payload) => {
+          void handleCheckoutRequest(payload);
+        }}
         checkoutLoading={isCheckingOut}
       />
     </>
   );
 }
-
-
-

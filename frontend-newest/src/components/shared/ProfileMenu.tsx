@@ -7,7 +7,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import type { User } from '@/types';
 
 interface ProfileMenuProps {
-  user: Pick<User, 'id' | 'name' | 'role' | 'phone'> | null;
+  user: Pick<User, 'id' | 'name' | 'role' | 'phone' | 'email' | 'defaultAddress'> | null;
   onLogout: () => void | Promise<void>;
   triggerClassName?: string;
 }
@@ -78,7 +78,19 @@ export function ProfileMenu({ user, onLogout, triggerClassName }: ProfileMenuPro
             <div className="px-4 py-3 border-b border-gray-100">
               <p className="text-sm font-semibold text-gray-900">{user?.name || '-'}</p>
               <p className="text-xs text-gray-500">Role: {user?.role || '-'}</p>
+              <p className="text-xs text-gray-500">Email: {user?.email || '-'}</p>
               <p className="text-xs text-gray-500">Phone: {user?.phone || '-'}</p>
+              <div className="mt-2 rounded-lg bg-gray-50 px-2 py-2">
+                <p className="text-[11px] font-semibold text-gray-700">Default Address</p>
+                <p className="mt-1 text-[11px] leading-4 text-gray-600 break-words">
+                  {user?.defaultAddress?.fullAddress || '-'}
+                </p>
+                {user?.defaultAddress?.lat != null && user?.defaultAddress?.lng != null && (
+                  <p className="mt-1 text-[11px] text-gray-500">
+                    Lat: {user.defaultAddress.lat.toFixed(6)} | Lng: {user.defaultAddress.lng.toFixed(6)}
+                  </p>
+                )}
+              </div>
               {user?.id && (
                 <div className="mt-2 flex items-center justify-between gap-2 rounded-lg bg-gray-50 px-2 py-1">
                   <p className="text-[11px] text-gray-600 truncate" title={user.id}>

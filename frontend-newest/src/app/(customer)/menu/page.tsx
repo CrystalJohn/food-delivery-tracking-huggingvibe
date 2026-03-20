@@ -4,7 +4,6 @@ import { MenuHero } from '@/features/menu/components/MenuHero';
 import { SidebarFilter } from '@/features/menu/components/SidebarFilter';
 import { MenuGrid } from '@/features/menu/components/MenuGrid';
 import { MenuSkeleton } from '@/features/menu/components/MenuSkeleton';
-import { LandingFooter } from '@/components/layout/LandingFooter';
 
 type SearchParams = { [key: string]: string | string[] | undefined };
 
@@ -32,7 +31,6 @@ export default async function MenuPage({
         </div>
       </div>
 
-      <LandingFooter />
     </div>
   );
 }

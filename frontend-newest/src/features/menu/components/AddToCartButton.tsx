@@ -6,6 +6,7 @@ import { ApiError } from '@/lib/api';
 import { useCart } from '@/features/cart';
 import { useAuth } from '@/features/auth';
 import { AuthRequiredPopup } from '@/components/shared/AuthRequiredPopup';
+import { toast } from 'react-toastify';
 
 interface AddToCartButtonProps {
   productId: string;
@@ -47,6 +48,7 @@ export function AddToCartButton({ productId, name, price }: AddToCartButtonProps
 
     try {
       await addItem(payload);
+      toast.success(`Added to cart: ${name} x1`);
       console.log('[AddToCartButton] addItem success', {
         productId,
         name,

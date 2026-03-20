@@ -7,6 +7,15 @@ export interface CreateOrderRequest {
 }
 
 export type PaymentMethod = 'CASH' | 'WALLET';
+export type DeliveryAddressMode = 'DEFAULT' | 'CUSTOM';
+
+export interface CheckoutActiveCartRequest {
+  paymentMethod: PaymentMethod;
+  deliveryAddressMode?: DeliveryAddressMode;
+  deliveryAddressText?: string;
+  deliveryLat?: number;
+  deliveryLng?: number;
+}
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -75,10 +84,17 @@ function normalizeOrderItem(raw: unknown, index: number): OrderItem {
 function normalizeOrder(raw: unknown): Order {
   const record = isRecord(raw) ? raw : {};
   const customer = getNestedRecord(record, 'customer');
+  const delivery = getNestedRecord(record, 'delivery');
   const deliveryLocation = getNestedRecord(record, 'deliveryLocation');
   const driverLocation = getNestedRecord(record, 'driverLocation');
   const itemsRaw = Array.isArray(record.items) ? record.items : [];
   const items = itemsRaw.map((item, index) => normalizeOrderItem(item, index));
+  const deliveryLat = asNumber(
+    record.deliveryLat ?? delivery?.lat ?? deliveryLocation?.lat,
+  );
+  const deliveryLng = asNumber(
+    record.deliveryLng ?? delivery?.lng ?? deliveryLocation?.lng,
+  );
 
   const totalAmount =
     asNumber(record.totalAmount) ??
@@ -91,7 +107,13 @@ function normalizeOrder(raw: unknown): Order {
     items,
     totalAmount,
     status: normalizeStatus(record.status),
-    deliveryAddress: asString(record.deliveryAddress ?? record.address) ?? '',
+    deliveryAddress:
+      asString(
+        record.deliveryAddress ??
+          record.deliveryAddressText ??
+          record.address ??
+          delivery?.addressText,
+      ) ?? '',
     deliveryPhone: asString(record.deliveryPhone ?? record.phone),
     notes: asString(record.notes),
     createdAt: asString(record.createdAt ?? record.created_at) ?? new Date().toISOString(),
@@ -99,8 +121,8 @@ function normalizeOrder(raw: unknown): Order {
     confirmedAt: asString(record.confirmedAt),
     deliveredAt: asString(record.deliveredAt),
     deliveryLocation:
-      deliveryLocation && asNumber(deliveryLocation.lat) != null && asNumber(deliveryLocation.lng) != null
-        ? { lat: asNumber(deliveryLocation.lat)!, lng: asNumber(deliveryLocation.lng)! }
+      deliveryLat != null && deliveryLng != null
+        ? { lat: deliveryLat, lng: deliveryLng }
         : null,
     driverLocation:
       driverLocation && asNumber(driverLocation.lat) != null && asNumber(driverLocation.lng) != null
@@ -154,11 +176,8 @@ export const orderService = {
     return normalizeSingleOrder(payload);
   },
 
-  async checkoutActiveCart(
-    paymentMethod: PaymentMethod,
-    opts?: { deliveryLat?: number; deliveryLng?: number },
-  ): Promise<Order> {
-    const payload = await api.post<unknown>('/orders', { paymentMethod, ...opts });
+  async checkoutActiveCart(data: CheckoutActiveCartRequest): Promise<Order> {
+    const payload = await api.post<unknown>('/orders', data);
     return normalizeSingleOrder(payload);
   },
 

@@ -12,6 +12,7 @@ import { useAuth } from '@/features/auth';
 import { ApiError } from '@/lib/api';
 import { AuthRequiredPopup } from '@/components/shared/AuthRequiredPopup';
 import { Minus, Plus, X } from 'lucide-react';
+import { toast } from 'react-toastify';
 
 interface MenuItemDetailModalProps {
   isOpen: boolean;
@@ -120,6 +121,7 @@ export function MenuItemDetailModal({ isOpen, onClose, itemId, initialProduct }:
     setIsAdding(true);
     try {
       await addItem(addData, quantity);
+      toast.success(`Added to cart: ${addData.name} x${quantity}`);
       onClose(); // Optional: close modal on success
     } catch (err) {
       if (isAuthRequiredError(err)) {
