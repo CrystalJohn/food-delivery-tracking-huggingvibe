@@ -58,7 +58,7 @@ describe('OrderService.createOrder address modes', () => {
     status: OrderStatus.PENDING,
     paymentMethod: PaymentMethod.CASH,
     paymentStatus: PaymentStatus.UNPAID,
-    totalAmount: 200000,
+    totalAmount: createdPayload.totalAmount,
     deliveryAddressText: createdPayload.deliveryAddressText,
     deliveryLat: createdPayload.deliveryLat,
     deliveryLng: createdPayload.deliveryLng,
@@ -158,6 +158,8 @@ describe('OrderService.createOrder address modes', () => {
       lat: 10.77,
       lng: 106.7,
     });
+
+    expect(result.totalAmount).toBe(230000);
   });
 
   it('uses payload delivery fields when mode is CUSTOM', async () => {
@@ -192,5 +194,9 @@ describe('OrderService.createOrder address modes', () => {
       lat: 10.81,
       lng: 106.66,
     });
+
+    expect(result.totalAmount).toBe(230000);
   });
 });
+
+

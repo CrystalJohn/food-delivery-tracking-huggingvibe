@@ -29,6 +29,7 @@ import { DriverOrderController } from './controllers/driver-order.controller';
 import { StaffMenuController } from './controllers/staff-menu.controller';
 import { AdminController } from './controllers/admin.controller';
 import { DriverProfileController } from './controllers/driver-profile.controller';
+import { StoreController } from './controllers/store.controller';
 
 import { AuthService } from './services/auth.service';
 import { MenuService } from './services/menu.service';
@@ -38,6 +39,7 @@ import { StaffOrderService } from './services/staff-order.service';
 import { DriverOrderService } from './services/driver-order.service';
 import { AdminService } from './services/admin.service';
 import { DriverProfileService } from './services/driver-profile.service';
+import { StoreService } from './services/store.service';
 
 import { JwtStrategy } from './auth/jwt.strategy';
 import { AuthModule } from './auth/auth.module';
@@ -94,6 +96,7 @@ import { TrackingGateway } from './gateways/tracking.gateway';
     StaffMenuController,
     AdminController,
     DriverProfileController,
+    StoreController,
   ],
   providers: [
     AuthService,
@@ -104,6 +107,7 @@ import { TrackingGateway } from './gateways/tracking.gateway';
     DriverOrderService,
     AdminService,
     DriverProfileService,
+    StoreService,
     JwtStrategy,
     MenuCategoryRepository,
     MenuItemRepository,

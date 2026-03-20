@@ -31,6 +31,9 @@ const CUSTOMER_CANCELLABLE_STATUSES: OrderStatus[] = [
   OrderStatus.CONFIRMED,
 ];
 
+const SHIPPING_FEE = 30000;
+const EARTH_RADIUS_KM = 6371;
+
 type DeliveryAddressSnapshot = {
   addressText: string;
   lat: number | null;
@@ -56,8 +59,12 @@ export class OrderService {
 
       this.validateCart(cart);
 
-      const totalAmount = this.calculateCartTotal(cart);
+      const itemsTotal = this.calculateCartTotal(cart);
       const deliveryAddress = this.resolveDeliveryAddress(dto, customer);
+
+      this.ensureDeliveryWithinRadius(deliveryAddress);
+
+      const totalAmount = itemsTotal + SHIPPING_FEE;
 
       const order = await this.orderRepository.create(
         {
@@ -330,6 +337,49 @@ export class OrderService {
     throw new BadRequestException('Invalid deliveryAddressMode');
   }
 
+  private ensureDeliveryWithinRadius(delivery: DeliveryAddressSnapshot) {
+    if (delivery.lat === null || delivery.lng === null) {
+      throw new BadRequestException(
+        'Delivery location coordinates are required for delivery.',
+      );
+    }
+
+    const distanceKm = this.calculateDistanceKm(
+      storeConfig.lat,
+      storeConfig.lng,
+      delivery.lat,
+      delivery.lng,
+    );
+
+    if (distanceKm > storeConfig.deliveryRadiusKm) {
+      throw new BadRequestException(
+        'Delivery address is outside delivery radius (' + storeConfig.deliveryRadiusKm + 'km).'
+      );
+    }
+  }
+
+  private calculateDistanceKm(
+    lat1: number,
+    lng1: number,
+    lat2: number,
+    lng2: number,
+  ) {
+    const toRadians = (value: number) => (value * Math.PI) / 180;
+
+    const dLat = toRadians(lat2 - lat1);
+    const dLng = toRadians(lng2 - lng1);
+
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(toRadians(lat1)) *
+        Math.cos(toRadians(lat2)) *
+        Math.sin(dLng / 2) *
+        Math.sin(dLng / 2);
+
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+    return EARTH_RADIUS_KM * c;
+  }
   private buildOrderItemsFromCart(cart: Cart, order: Order): OrderItem[] {
     return cart.items.map((cartItem) => {
       const firstImage = cartItem.menuItem.images?.[0];
@@ -528,3 +578,7 @@ export class OrderService {
     };
   }
 }
+
+
+
+

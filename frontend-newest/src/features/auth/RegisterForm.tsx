@@ -42,9 +42,10 @@ function geoWarn(event: string, payload?: GeoLogPayload) {
 }
 
 function geoError(event: string, payload?: GeoLogPayload) {
-  console.error(`${GEO_LOG_PREFIX} ${event}`, {
+  const fallbackPayload = payload && Object.keys(payload).length > 0 ? payload : { note: 'no_payload' };
+  console.warn(`${GEO_LOG_PREFIX} ${event}`, {
     at: new Date().toISOString(),
-    ...(payload ?? {}),
+    ...fallbackPayload,
   });
 }
 

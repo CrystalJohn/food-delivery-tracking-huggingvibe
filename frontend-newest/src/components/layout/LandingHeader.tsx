@@ -46,13 +46,7 @@ export function LandingHeader() {
     router.push('/');
   };
 
-  const handleCheckoutRequest = async ({
-    paymentMethod,
-    addressOption,
-    customAddress,
-    customAddressLat,
-    customAddressLng,
-  }: CartCheckoutPayload) => {
+  const handleCheckoutRequest = async ({ paymentMethod }: CartCheckoutPayload) => {
     if (isCheckingOut) return;
 
     if (!isAuthenticated) {
@@ -60,27 +54,10 @@ export function LandingHeader() {
       return;
     }
 
-    if (
-      addressOption === 'CUSTOM' &&
-      (!customAddress || customAddressLat == null || customAddressLng == null)
-    ) {
-      toast.error('Please select custom address suggestion or use My Location before checkout.');
-      return;
-    }
-
-    const checkoutPayload =
-      addressOption === 'CUSTOM'
-        ? {
-            paymentMethod,
-            deliveryAddressMode: 'CUSTOM' as const,
-            deliveryAddressText: customAddress,
-            deliveryLat: customAddressLat,
-            deliveryLng: customAddressLng,
-          }
-        : {
-            paymentMethod,
-            deliveryAddressMode: 'DEFAULT' as const,
-          };
+    const checkoutPayload = {
+      paymentMethod,
+      deliveryAddressMode: 'DEFAULT' as const,
+    };
 
     setIsCheckingOut(true);
     try {
@@ -217,6 +194,8 @@ export function LandingHeader() {
         onClose={() => setIsCartOpen(false)}
         items={sidebarItems}
         defaultAddress={user?.defaultAddress?.fullAddress ?? ''}
+        defaultAddressLat={user?.defaultAddress?.lat}
+        defaultAddressLng={user?.defaultAddress?.lng}
         onUpdateQuantity={(id, quantity) => {
           void updateQuantity(id, quantity);
         }}

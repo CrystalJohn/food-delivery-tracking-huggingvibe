@@ -1,22 +1,17 @@
 ﻿'use client';
 
-import { useEffect, useRef, useState } from 'react';
-import { X, Trash2, Minus, Plus, ShoppingBag, MapPin, Navigation } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { X, Trash2, Minus, Plus, ShoppingBag } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Image from 'next/image';
 import { Button } from '@/components/ui/Button';
-import { useGoogleMaps } from '@/lib/GoogleMapsProvider';
+import { storeService, type StoreDistanceResponse } from '@/features/store';
 
 const currencyFormatter = new Intl.NumberFormat('vi-VN');
 export type PaymentMethod = 'CASH' | 'WALLET';
-export type DeliveryAddressOption = 'DEFAULT' | 'CUSTOM';
 
 export interface CartCheckoutPayload {
   paymentMethod: PaymentMethod;
-  addressOption: DeliveryAddressOption;
-  customAddress?: string;
-  customAddressLat?: number;
-  customAddressLng?: number;
 }
 
 interface CartItem {
@@ -32,6 +27,8 @@ interface CartSidebarProps {
   onClose: () => void;
   items?: CartItem[];
   defaultAddress?: string;
+  defaultAddressLat?: number;
+  defaultAddressLng?: number;
   onUpdateQuantity?: (id: string, quantity: number) => void;
   onRemoveItem?: (id: string) => void;
   onCheckout?: (payload: CartCheckoutPayload) => void | Promise<void>;
@@ -43,124 +40,64 @@ export function CartSidebar({
   onClose,
   items = [],
   defaultAddress = '',
+  defaultAddressLat,
+  defaultAddressLng,
   onUpdateQuantity,
   onRemoveItem,
   onCheckout,
   checkoutLoading = false,
 }: CartSidebarProps) {
-  const mapsContext = useGoogleMaps();
-  const isPlacesLoaded = mapsContext?.isLoaded ?? false;
-  const hasApiKey = mapsContext?.hasApiKey ?? false;
-  const inputRef = useRef<HTMLInputElement>(null);
   const totalAmount = items.reduce((acc, item) => acc + item.price * item.quantity, 0);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('CASH');
-  const [addressOption, setAddressOption] = useState<DeliveryAddressOption>('DEFAULT');
-  const [customAddress, setCustomAddress] = useState('');
-  const [customAddressCoords, setCustomAddressCoords] = useState<{ lat: number; lng: number } | null>(
-    null,
-  );
-  const [locationError, setLocationError] = useState<string | null>(null);
-  const [isResolvingLocation, setIsResolvingLocation] = useState(false);
-  const trimmedCustomAddress = customAddress.trim();
-  const customAddressTooShort =
-    addressOption === 'CUSTOM' && trimmedCustomAddress.length > 0 && trimmedCustomAddress.length < 5;
-  const customAddressRequired =
-    addressOption === 'CUSTOM' && trimmedCustomAddress.length === 0;
-  const customCoordsRequired = addressOption === 'CUSTOM' && !customAddressCoords;
+  const [distanceInfo, setDistanceInfo] = useState<StoreDistanceResponse | null>(null);
+  const [distanceLoading, setDistanceLoading] = useState(false);
+  const [distanceError, setDistanceError] = useState('');
+
+  const hasCoords = defaultAddressLat != null && defaultAddressLng != null;
+  const isWithinRadius = distanceInfo?.withinRadius ?? false;
   const checkoutDisabled =
     checkoutLoading ||
     !onCheckout ||
-    customAddressTooShort ||
-    customAddressRequired ||
-    customCoordsRequired;
+    !hasCoords ||
+    (distanceInfo ? !isWithinRadius : false);
 
   useEffect(() => {
-    if (!isOpen || !isPlacesLoaded || !inputRef.current || !window.google?.maps?.places) return;
-
-    const autocomplete = new window.google.maps.places.Autocomplete(inputRef.current, {
-      types: ['address'],
-      componentRestrictions: { country: ['vn'] },
-      fields: ['geometry', 'formatted_address'],
-    });
-
-    autocomplete.addListener('place_changed', () => {
-      const place = autocomplete.getPlace();
-      const location = place.geometry?.location;
-      const formattedAddress = place.formatted_address ?? inputRef.current?.value ?? '';
-
-      setCustomAddress(formattedAddress);
-      setLocationError(null);
-
-      if (!location) {
-        setCustomAddressCoords(null);
-        return;
-      }
-
-      setCustomAddressCoords({
-        lat: location.lat(),
-        lng: location.lng(),
-      });
-    });
-
-    return () => {
-      window.google?.maps?.event?.clearInstanceListeners(autocomplete);
-    };
-  }, [isOpen, isPlacesLoaded]);
-
-  const mapGeolocationErrorMessage = (error: GeolocationPositionError): string => {
-    switch (error.code) {
-      case error.PERMISSION_DENIED:
-        return 'Location permission is denied. Please allow location access and try again.';
-      case error.POSITION_UNAVAILABLE:
-        return 'Location information is unavailable. Please try selecting an address suggestion.';
-      case error.TIMEOUT:
-        return 'Location request timed out. Please try again.';
-      default:
-        return error.message || 'Unable to get current location.';
-    }
-  };
-
-  const handleUseMyLocation = () => {
-    if (!navigator.geolocation) {
-      setLocationError('This browser does not support geolocation.');
+    if (!isOpen || !hasCoords) {
+      setDistanceInfo(null);
+      setDistanceError('');
       return;
     }
 
-    setIsResolvingLocation(true);
-    setLocationError(null);
-
-    navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        const lat = position.coords.latitude;
-        const lng = position.coords.longitude;
-        let resolvedAddress = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
-
-        if (window.google?.maps?.Geocoder) {
-          try {
-            const geocoder = new window.google.maps.Geocoder();
-            const response = await geocoder.geocode({ location: { lat, lng } });
-            const formattedAddress = response.results[0]?.formatted_address;
-            if (formattedAddress) {
-              resolvedAddress = formattedAddress;
-            }
-          } catch (error) {
-            console.warn('[CartSidebar] reverse geocoding failed', error);
-          }
+    let canceled = false;
+    const fetchDistance = async () => {
+      setDistanceLoading(true);
+      setDistanceError('');
+      try {
+        const response = await storeService.getStoreDistance({
+          lat: defaultAddressLat!,
+          lng: defaultAddressLng!,
+        });
+        if (!canceled) {
+          setDistanceInfo(response);
         }
+      } catch (error) {
+        console.error('[CartSidebar] store distance fetch failed', error);
+        if (!canceled) {
+          setDistanceError('Khong the kiem tra khoang cach. Vui long thu lai.');
+        }
+      } finally {
+        if (!canceled) {
+          setDistanceLoading(false);
+        }
+      }
+    };
 
-        setCustomAddress(resolvedAddress);
-        setCustomAddressCoords({ lat, lng });
-        setLocationError(null);
-        setIsResolvingLocation(false);
-      },
-      (error) => {
-        setLocationError(mapGeolocationErrorMessage(error));
-        setCustomAddressCoords(null);
-        setIsResolvingLocation(false);
-      },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 5000 },
-    );
-  };
+    void fetchDistance();
+
+    return () => {
+      canceled = true;
+    };
+  }, [isOpen, hasCoords, defaultAddressLat, defaultAddressLng]);
 
   return (
     <AnimatePresence>
@@ -263,20 +200,12 @@ export function CartSidebar({
 
                 <div className="space-y-2">
                   <p className="text-sm font-semibold text-gray-700">Delivery Address</p>
-                  <button
-                    type="button"
-                    onClick={() => setAddressOption('DEFAULT')}
-                    className={`w-full rounded-xl border p-3 text-left transition-colors ${
-                      addressOption === 'DEFAULT'
-                        ? 'border-red-600 bg-red-50'
-                        : 'border-gray-200 bg-white hover:bg-gray-50'
-                    }`}
-                  >
+                  <div className="w-full rounded-xl border border-red-600 bg-red-50 p-3 text-left">
                     <div className="flex items-start gap-2">
                       <input
                         type="radio"
-                        checked={addressOption === 'DEFAULT'}
-                        onChange={() => setAddressOption('DEFAULT')}
+                        checked
+                        readOnly
                         className="mt-1 h-4 w-4"
                       />
                       <div>
@@ -288,76 +217,36 @@ export function CartSidebar({
                         </p>
                       </div>
                     </div>
-                  </button>
-
-                  <div
-                    className={`rounded-xl border p-3 transition-colors ${
-                      addressOption === 'CUSTOM'
-                        ? 'border-red-600 bg-red-50'
-                        : 'border-gray-200 bg-white'
-                    }`}
-                  >
-                    <label className="flex cursor-pointer items-start gap-2">
-                      <input
-                        type="radio"
-                        checked={addressOption === 'CUSTOM'}
-                        onChange={() => setAddressOption('CUSTOM')}
-                        className="mt-1 h-4 w-4"
-                      />
-                      <span className="text-sm font-semibold text-gray-800">Địa chỉ muốn giao</span>
-                    </label>
-                    <button
-                      type="button"
-                      onClick={handleUseMyLocation}
-                      disabled={addressOption !== 'CUSTOM' || isResolvingLocation}
-                      className="mt-2 flex w-full items-center justify-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700 transition-colors hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      <Navigation className="h-4 w-4" />
-                      {isResolvingLocation ? 'Getting your location...' : 'My Location'}
-                    </button>
-                    <div className="relative mt-2">
-                      <MapPin className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-                      <input
-                        ref={inputRef}
-                        type="text"
-                        value={customAddress}
-                        onChange={(e) => {
-                          setCustomAddress(e.target.value);
-                          setCustomAddressCoords(null);
-                          setLocationError(null);
-                        }}
-                        disabled={addressOption !== 'CUSTOM'}
-                        placeholder="Nhập địa chỉ muốn giao"
-                        className="w-full rounded-lg border border-gray-200 bg-white py-2 pl-9 pr-3 text-sm text-gray-800 outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100 disabled:bg-gray-100 disabled:text-gray-400"
-                      />
-                    </div>
-                    {addressOption === 'CUSTOM' && customAddressCoords && (
-                      <p className="mt-1 text-xs text-green-700">
-                        Lat: {customAddressCoords.lat.toFixed(6)} | Lng: {customAddressCoords.lng.toFixed(6)}
-                      </p>
-                    )}
-                    {customAddressRequired && (
-                      <p className="mt-1 text-xs text-red-600">
-                        Please enter custom delivery address.
-                      </p>
-                    )}
-                    {customAddressTooShort && (
-                      <p className="mt-1 text-xs text-red-600">
-                        Custom address must be at least 5 characters.
-                      </p>
-                    )}
-                    {customCoordsRequired && !customAddressRequired && !customAddressTooShort && (
-                      <p className="mt-1 text-xs text-red-600">
-                        Please choose an address suggestion or use My Location so system can get coordinates.
-                      </p>
-                    )}
-                    {locationError && addressOption === 'CUSTOM' && (
-                      <p className="mt-1 text-xs text-red-600">{locationError}</p>
-                    )}
-                    {addressOption === 'CUSTOM' && hasApiKey && !isPlacesLoaded && (
-                      <p className="mt-1 text-xs text-amber-700">Loading address suggestions...</p>
-                    )}
                   </div>
+                  {distanceLoading && (
+                    <p className="text-xs text-gray-500">Dang kiem tra khoang cach giao hang...</p>
+                  )}
+                  {!distanceLoading && distanceInfo && (
+                    <div className="flex flex-wrap items-center gap-2 text-xs text-gray-600">
+                      <span>Khoang cach: {distanceInfo.distanceKm} km</span>
+                      <span>|</span>
+                      <span>Ban kinh: {distanceInfo.deliveryRadiusKm} km</span>
+                    </div>
+                  )}
+                  {!distanceLoading && distanceInfo && (
+                    <div
+                      className={`inline-flex w-fit rounded-full px-3 py-1 text-xs font-semibold ${
+                        distanceInfo.withinRadius
+                          ? 'bg-emerald-100 text-emerald-700'
+                          : 'bg-red-100 text-red-700'
+                      }`}
+                    >
+                      {distanceInfo.withinRadius ? 'Trong pham vi giao hang' : 'Ngoai pham vi giao hang'}
+                    </div>
+                  )}
+                  {!hasCoords && (
+                    <p className="text-xs text-red-600">
+                      Chua co toa do dia chi. Vui long cap nhat dia chi trong ho so.
+                    </p>
+                  )}
+                  {distanceError && (
+                    <p className="text-xs text-red-600">{distanceError}</p>
+                  )}
                 </div>
 
                 <div className="space-y-2">
@@ -391,16 +280,7 @@ export function CartSidebar({
                 <Button
                   onClick={() => {
                     if (onCheckout) {
-                      void onCheckout({
-                        paymentMethod,
-                        addressOption,
-                        customAddress:
-                          addressOption === 'CUSTOM' ? trimmedCustomAddress : undefined,
-                        customAddressLat:
-                          addressOption === 'CUSTOM' ? customAddressCoords?.lat : undefined,
-                        customAddressLng:
-                          addressOption === 'CUSTOM' ? customAddressCoords?.lng : undefined,
-                      });
+                      void onCheckout({ paymentMethod });
                     }
                   }}
                   disabled={checkoutDisabled}
